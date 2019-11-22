@@ -1,6 +1,117 @@
 Changelog
 ---------
 
+0.20.6
+^^^^^^
+Thursday 21st November 2019
+
+ * MySQL configuration handling (#395)
+ * Use juju ssh for get_ubuntu_release_from_sentry (#396)
+ * Policyd library changes to support openstack-dashboard (#393)
+
+0.20.5
+^^^^^^
+Monday 18th November 2019
+
+ * ufw: add support for new keywords as well as a function to retrieve rules (#390)
+ * Duplicate resource retry fix from reactive (#392)
+ * Add section-placement (#389)
+ * Update swift versions for train (#388)
+ * Fix the py35 issue with json not accepting bytestrings (#387)
+ * Fix policyd on trusty (py34 issue) (#386)
+ * Add support for the action-log hook command (#385)
+ * Update the policyd docstrings due to charm changes (#382)
+ * Fix policyd on py35 (#384)
+
+0.20.4
+^^^^^^
+Friday 4th October 2019
+
+* Stop duplicate ops being added to CephBrokerRq (#381)
+* Allow OpenStack deployments from PPA packages (#380)
+* MySQL 8 features (#377)
+* Fix policyd helper where when the config value is set to false (#379)
+
+0.20.3
+^^^^^^
+Friday 27th September 2019
+
+* Add policyd override helpers (#368)
+* Resource parameter order is important in Eoan (#373)
+* Complete Eoan Enablement (#372)
+* Conditionally add port_forwarding to l3_extension_plugins (#370)
+* Allow enabling the pg autoscaler when the module is enabled (#343)
+* Change openstack amulet helper to use `OS_` env var format (#369)
+
+0.20.2
+^^^^^^
+Tuesday 27th August 2019
+
+* get_system_env: Search should be case sensitive (#365)
+* fetch: Override apt execution environment (#360)
+
+0.20.1
+^^^^^^
+Wednesday 14th August 2019
+
+* Remove ``psutil`` from ``setup.py`` (#359)
+
+0.20.0
+^^^^^^
+Tuesday 13th August 2019
+
+* Replace ``python-apt`` functionality (#341)
+* Add context with info about running host (#357)
+* Use "rabbit_use_ssl" instead of "ssl" for ocata config (#355)
+* Add getter helpers to contrib ovs module (#353)
+* Allow the current password to be passed in. (#354)
+* Optionally configure haproxy (#351)
+
+0.19.16
+^^^^^^^
+Wednesday 17th July 2019
+
+ * Use pymysql >= Queens (#348)
+ * Add helper to get the percona entry for amulet (#349)
+ * Adding function to check if relation has proper broker_rsp (#347)
+ * Add service_{project,domain}_id keys to Ident ctxt (#346)
+
+0.19.15
+^^^^^^^
+Tuesday 9rd July 2019
+
+ * Make NRPE.add_check(shortname=...) optional again (#345)
+
+0.19.14
+^^^^^^^
+Wednesday 3rd July 2019
+
+ * Preserve old keymap entries on NRPE.write (#311)
+ * Make ConfigParser not strict (#338)
+ * Update tests to actually be run (#339)
+ * Make XFS inode size configurable (#313)
+ * ovs: Allow IPFIX configuration tuning (#335)
+ * Set unit_name when requesting certificates. (#334)
+ * Add relation support for firewall group logging (#333)
+ * Fix vendor_data py3 issue of PR #324 (#332)
+ * Fix wrong usage of relation_get in \*_broker_action_done (#327)
+ * Ensure CephContext will correctly be incomplete (#329)
+ * openstack: Add data for train release (#328)
+ * adding newton & above release support for nuage (#305)
+ * Add source keys before the apt list entry. (#326)
+ * Add Contexts for Nova Vendor Metadata (#324)
+ * openstack: add send_notifications_to_logs option (#323)
+ * openstack: rename physical-network-mtus, global-physnet-mtu for jinja (#322)
+ * openstack: add global-physnet-mtu to NeutronAPIContext  (#317)
+ * Openstack port resolver should filter out non-existent ports (#320)
+ * Fix typo in filter_installed_packages call (#318)
+ * Fix issue with ceph-radosgw unit-tests (#316)
+ * Bug/1786186 (#315)
+ * Switch test runner to tox and update travis-ci definition (#301)
+ * openstack: oslo messaging notification (#310)
+ * Re-enable pgrep_full (#309)
+ * contrib/openstack: Return status on process certificates (#308)
+
 0.19.13
 ^^^^^^^
 Tuesday 9th April 2019

@@ -18,6 +18,7 @@ import json
 import math
 import os
 import re
+import socket
 import time
 from base64 import b64decode
 from subprocess import check_call, CalledProcessError
@@ -258,7 +259,7 @@ class SharedDBContext(OSContextGenerator):
                     'database_password': rdata.get(password_setting),
                     'database_type': 'mysql+pymysql'
                 }
-                if CompareOpenStackReleases(rel) < 'stein':
+                if CompareOpenStackReleases(rel) < 'queens':
                     ctxt['database_type'] = 'mysql'
                 if self.context_complete(ctxt):
                     db_ssl(rdata, ctxt, self.ssl_dir)
@@ -443,8 +444,10 @@ class IdentityServiceContext(OSContextGenerator):
                              'api_version': api_version})
 
                 if float(api_version) > 2:
-                    ctxt.update({'admin_domain_name':
-                                 rdata.get('service_domain')})
+                    ctxt.update({
+                        'admin_domain_name': rdata.get('service_domain'),
+                        'service_project_id': rdata.get('service_tenant_id'),
+                        'service_domain_id': rdata.get('service_domain_id')})
 
                 # we keep all veriables in ctxt for compatibility and
                 # add nested dictionary for keystone_authtoken generic
@@ -1710,6 +1713,14 @@ class NeutronAPIContext(OSContextGenerator):
                 'rel_key': 'enable-nsg-logging',
                 'default': False,
             },
+            'enable_nfg_logging': {
+                'rel_key': 'enable-nfg-logging',
+                'default': False,
+            },
+            'enable_port_forwarding': {
+                'rel_key': 'enable-port-forwarding',
+                'default': False,
+            },
             'global_physnet_mtu': {
                 'rel_key': 'global-physnet-mtu',
                 'default': 1500,
@@ -1738,6 +1749,13 @@ class NeutronAPIContext(OSContextGenerator):
             extension_drivers.append('log')
 
         ctxt['extension_drivers'] = ','.join(extension_drivers)
+
+        l3_extension_plugins = []
+
+        if ctxt['enable_port_forwarding']:
+            l3_extension_plugins.append('port_forwarding')
+
+        ctxt['l3_extension_plugins'] = l3_extension_plugins
 
         return ctxt
 
@@ -1922,7 +1940,7 @@ class VolumeAPIContext(InternalEndpointContext):
         as well as the catalog_info string that would be supplied. Returns
         a dict containing the volume_api_version and the volume_catalog_info.
         """
-        rel = os_release(self.pkg, base='icehouse')
+        rel = os_release(self.pkg)
         version = '2'
         if CompareOpenStackReleases(rel) >= 'pike':
             version = '3'
@@ -2122,7 +2140,7 @@ class VersionsContext(OSContextGenerator):
         self.pkg = pkg
 
     def __call__(self):
-        ostack = os_release(self.pkg, base='icehouse')
+        ostack = os_release(self.pkg)
         osystem = lsb_release()['DISTRIB_CODENAME'].lower()
         return {
             'openstack_release': ostack,
@@ -2152,5 +2170,16 @@ class LogrotateContext(OSContextGenerator):
             'logrotate_logs_location': self.location,
             'logrotate_interval': self.interval,
             'logrotate_count': self.count,
+        }
+        return ctxt
+
+
+class HostInfoContext(OSContextGenerator):
+    """Context to provide host information."""
+
+    def __call__(self):
+        ctxt = {
+            'host_fqdn': socket.getfqdn(),
+            'host': socket.gethostname(),
         }
         return ctxt

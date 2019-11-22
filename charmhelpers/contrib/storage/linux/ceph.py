@@ -301,6 +301,7 @@ class ReplicatedPool(Pool):
                  percent_data=10.0, app_name=None):
         super(ReplicatedPool, self).__init__(service=service, name=name)
         self.replicas = replicas
+        self.percent_data = percent_data
         if pg_num:
             # Since the number of placement groups were specified, ensure
             # that there aren't too many created.
@@ -324,12 +325,24 @@ class ReplicatedPool(Pool):
                 update_pool(client=self.service,
                             pool=self.name,
                             settings={'size': str(self.replicas)})
+                nautilus_or_later = cmp_pkgrevno('ceph-common', '14.2.0') >= 0
+                if nautilus_or_later:
+                    # Ensure we set the expected pool ratio
+                    update_pool(client=self.service,
+                                pool=self.name,
+                                settings={'target_size_ratio': str(self.percent_data / 100.0)})
                 try:
                     set_app_name_for_pool(client=self.service,
                                           pool=self.name,
                                           name=self.app_name)
                 except CalledProcessError:
                     log('Could not set app name for pool {}'.format(self.name, level=WARNING))
+                if 'pg_autoscaler' in enabled_manager_modules():
+                    try:
+                        enable_pg_autoscale(self.service, self.name)
+                    except CalledProcessError as e:
+                        log('Could not configure auto scaling for pool {}: {}'.format(
+                            self.name, e, level=WARNING))
             except CalledProcessError:
                 raise
 
@@ -382,11 +395,51 @@ class ErasurePool(Pool):
                                           name=self.app_name)
                 except CalledProcessError:
                     log('Could not set app name for pool {}'.format(self.name, level=WARNING))
+                nautilus_or_later = cmp_pkgrevno('ceph-common', '14.2.0') >= 0
+                if nautilus_or_later:
+                    # Ensure we set the expected pool ratio
+                    update_pool(client=self.service,
+                                pool=self.name,
+                                settings={'target_size_ratio': str(self.percent_data / 100.0)})
+                if 'pg_autoscaler' in enabled_manager_modules():
+                    try:
+                        enable_pg_autoscale(self.service, self.name)
+                    except CalledProcessError as e:
+                        log('Could not configure auto scaling for pool {}: {}'.format(
+                            self.name, e, level=WARNING))
             except CalledProcessError:
                 raise
 
     """Get an existing erasure code profile if it already exists.
        Returns json formatted output"""
+
+
+def enabled_manager_modules():
+    """Return a list of enabled manager modules.
+
+    :rtype: List[str]
+    """
+    cmd = ['ceph', 'mgr', 'module', 'ls']
+    try:
+        modules = check_output(cmd)
+        if six.PY3:
+            modules = modules.decode('UTF-8')
+    except CalledProcessError as e:
+        log("Failed to list ceph modules: {}".format(e), WARNING)
+        return []
+    modules = json.loads(modules)
+    return modules['enabled_modules']
+
+
+def enable_pg_autoscale(service, pool_name):
+    """
+    Enable Ceph's PG autoscaler for the specified pool.
+
+    :param service: six.string_types. The Ceph user name to run the command under
+    :param pool_name: six.string_types. The name of the pool to enable sutoscaling on
+    :raise: CalledProcessError if the command fails
+    """
+    check_call(['ceph', '--id', service, 'osd', 'pool', 'set', pool_name, 'pg_autoscale_mode', 'on'])
 
 
 def get_mon_map(service):
@@ -1134,6 +1187,15 @@ class CephBrokerRq(object):
             self.request_id = str(uuid.uuid1())
         self.ops = []
 
+    def add_op(self, op):
+        """Add an op if it is not already in the list.
+
+        :param op: Operation to add.
+        :type op: dict
+        """
+        if op not in self.ops:
+            self.ops.append(op)
+
     def add_op_request_access_to_group(self, name, namespace=None,
                                        permission=None, key_name=None,
                                        object_prefix_permissions=None):
@@ -1147,7 +1209,7 @@ class CephBrokerRq(object):
                 'rwx': ['prefix1', 'prefix2'],
                 'class-read': ['prefix3']}
         """
-        self.ops.append({
+        self.add_op({
             'op': 'add-permissions-to-key', 'group': name,
             'namespace': namespace,
             'name': key_name or service_name(),
@@ -1200,11 +1262,11 @@ class CephBrokerRq(object):
         if pg_num and weight:
             raise ValueError('pg_num and weight are mutually exclusive')
 
-        self.ops.append({'op': 'create-pool', 'name': name,
-                         'replicas': replica_count, 'pg_num': pg_num,
-                         'weight': weight, 'group': group,
-                         'group-namespace': namespace, 'app-name': app_name,
-                         'max-bytes': max_bytes, 'max-objects': max_objects})
+        self.add_op({'op': 'create-pool', 'name': name,
+                     'replicas': replica_count, 'pg_num': pg_num,
+                     'weight': weight, 'group': group,
+                     'group-namespace': namespace, 'app-name': app_name,
+                     'max-bytes': max_bytes, 'max-objects': max_objects})
 
     def add_op_create_erasure_pool(self, name, erasure_profile=None,
                                    weight=None, group=None, app_name=None,
@@ -1232,12 +1294,12 @@ class CephBrokerRq(object):
         :param max_objects: Maximum objects quota to apply
         :type max_objects: int
         """
-        self.ops.append({'op': 'create-pool', 'name': name,
-                         'pool-type': 'erasure',
-                         'erasure-profile': erasure_profile,
-                         'weight': weight,
-                         'group': group, 'app-name': app_name,
-                         'max-bytes': max_bytes, 'max-objects': max_objects})
+        self.add_op({'op': 'create-pool', 'name': name,
+                     'pool-type': 'erasure',
+                     'erasure-profile': erasure_profile,
+                     'weight': weight,
+                     'group': group, 'app-name': app_name,
+                     'max-bytes': max_bytes, 'max-objects': max_objects})
 
     def set_ops(self, ops):
         """Set request ops to provided value.
@@ -1480,6 +1542,21 @@ def send_request_if_needed(request, relation='ceph'):
         for rid in relation_ids(relation):
             log('Sending request {}'.format(request.request_id), level=DEBUG)
             relation_set(relation_id=rid, broker_req=request.request)
+
+
+def has_broker_rsp(rid=None, unit=None):
+    """Return True if the broker_rsp key is 'truthy' (i.e. set to something) in the relation data.
+
+    :param rid: The relation to check (default of None means current relation)
+    :type rid: Union[str, None]
+    :param unit: The remote unit to check (default of None means current unit)
+    :type unit: Union[str, None]
+    :returns: True if broker key exists and is set to something 'truthy'
+    :rtype: bool
+    """
+    rdata = relation_get(rid=rid, unit=unit) or {}
+    broker_rsp = rdata.get(get_broker_rsp_key())
+    return True if broker_rsp else False
 
 
 def is_broker_action_done(action, rid=None, unit=None):
