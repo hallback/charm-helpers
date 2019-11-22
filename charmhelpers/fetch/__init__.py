@@ -112,6 +112,8 @@ if __platform__ == "ubuntu":
     upgrade = fetch.apt_upgrade
     update = _fetch_update = fetch.apt_update
     purge = fetch.apt_purge
+    apt_pkg = fetch.ubuntu_apt_pkg
+    get_apt_dpkg_env = fetch.get_apt_dpkg_env
 elif __platform__ == "centos":
     yum_search = fetch.yum_search
     # new adds

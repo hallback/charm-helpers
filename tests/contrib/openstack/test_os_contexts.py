@@ -193,12 +193,15 @@ IDENTITY_SERVICE_RELATION_HTTPS = {
 
 IDENTITY_SERVICE_RELATION_VERSIONED = {
     'api_version': '3',
+    'service_tenant_id': 'svc-proj-id',
+    'service_domain_id': 'svc-dom-id',
 }
 IDENTITY_SERVICE_RELATION_VERSIONED.update(IDENTITY_SERVICE_RELATION_HTTPS)
 
 IDENTITY_CREDENTIALS_RELATION_VERSIONED = {
     'api_version': '3',
-    'service_domain_id': '567890',
+    'service_tenant_id': 'svc-proj-id',
+    'service_domain_id': 'svc-dom-id',
 }
 IDENTITY_CREDENTIALS_RELATION_VERSIONED.update(IDENTITY_CREDENTIALS_RELATION_UNSET)
 
@@ -734,7 +737,7 @@ class ContextTests(unittest.TestCase):
     @patch.object(context, 'get_os_codename_install_source')
     def test_shared_db_context_with_data(self, os_codename):
         '''Test shared-db context with all required data'''
-        os_codename.return_value = 'stein'
+        os_codename.return_value = 'queens'
         relation = FakeRelation(relation_data=SHARED_DB_RELATION)
         self.relation_get.side_effect = relation.get
         self.get_address_in_network.return_value = ''
@@ -769,7 +772,7 @@ class ContextTests(unittest.TestCase):
     def test_shared_db_context_with_data_and_access_net_match(self,
                                                               os_codename):
         """Correctly set hostname for access net returns complete context"""
-        os_codename.return_value = 'stein'
+        os_codename.return_value = 'queens'
         relation = FakeRelation(
             relation_data=SHARED_DB_RELATION_ACCESS_NETWORK)
         self.relation_get.side_effect = relation.get
@@ -789,7 +792,7 @@ class ContextTests(unittest.TestCase):
     @patch.object(context, 'get_os_codename_install_source')
     def test_shared_db_context_explicit_relation_id(self, os_codename):
         '''Test shared-db context setting the relation_id'''
-        os_codename.return_value = 'stein'
+        os_codename.return_value = 'queens'
         relation = FakeRelation(relation_data=SHARED_DB_RELATION_ALT_RID)
         self.related_units.return_value = ['mysql-alt/0']
         self.relation_get.side_effect = relation.get
@@ -880,9 +883,9 @@ class ContextTests(unittest.TestCase):
                      'database_type': 'mysql+pymysql'})
 
     @patch.object(context, 'get_os_codename_install_source')
-    def test_shared_db_context_with_params_rocky(self, os_codename):
+    def test_shared_db_context_with_params_pike(self, os_codename):
         '''Test shared-db context with object parameters'''
-        os_codename.return_value = 'rocky'
+        os_codename.return_value = 'pike'
         shared_db = context.SharedDBContext(
             database='quantum', user='quantum', relation_prefix='quantum')
         relation = FakeRelation(relation_data=SHARED_DB_RELATION_NAMESPACED)
@@ -1132,8 +1135,10 @@ class ContextTests(unittest.TestCase):
             'admin_password': 'foo',
             'admin_domain_name': 'admin_domain',
             'admin_tenant_name': 'admin',
-            'admin_tenant_id': None,
-            'admin_domain_id': None,
+            'admin_tenant_id': 'svc-proj-id',
+            'admin_domain_id': 'svc-dom-id',
+            'service_project_id': 'svc-proj-id',
+            'service_domain_id': 'svc-dom-id',
             'admin_user': 'adam',
             'auth_host': 'keystone-host.local',
             'auth_port': '35357',
@@ -1211,8 +1216,7 @@ class ContextTests(unittest.TestCase):
     @patch.object(context, 'filter_installed_packages')
     @patch.object(context, 'os_release')
     def test_keystone_authtoken_www_authenticate_uri_stein_apiv3(self, mock_os_release, mock_filter_installed_packages):
-        relation_data = deepcopy(IDENTITY_SERVICE_RELATION_UNSET)
-        relation_data['api_version'] = '3'
+        relation_data = deepcopy(IDENTITY_SERVICE_RELATION_VERSIONED)
         relation = FakeRelation(relation_data=relation_data)
         self.relation_get.side_effect = relation.get
 
@@ -1227,8 +1231,8 @@ class ContextTests(unittest.TestCase):
 
         expected = collections.OrderedDict((
             ('auth_type', 'password'),
-            ('www_authenticate_uri', 'http://keystonehost.local:5000/v3'),
-            ('auth_url', 'http://keystone-host.local:35357/v3'),
+            ('www_authenticate_uri', 'https://keystonehost.local:5000/v3'),
+            ('auth_url', 'https://keystone-host.local:35357/v3'),
             ('project_domain_name', 'admin_domain'),
             ('user_domain_name', 'admin_domain'),
             ('project_name', 'admin'),
@@ -3547,6 +3551,38 @@ class ContextTests(unittest.TestCase):
         api_ctxt = context.NeutronAPIContext()()
         self.assertEquals(api_ctxt['extension_drivers'], 'qos,log')
 
+    def test_neutronapicontext_firewall_group_logging_on(self):
+        self.setup_neutron_api_context_relation({
+            'enable-nfg-logging': 'True',
+            'l2-population': 'True'
+        })
+        api_ctxt = context.NeutronAPIContext()()
+        self.assertEquals(api_ctxt['enable_nfg_logging'], True)
+
+    def test_neutronapicontext_firewall_group_logging_off(self):
+        self.setup_neutron_api_context_relation({
+            'enable-nfg-logging': 'False',
+            'l2-population': 'True'
+        })
+        api_ctxt = context.NeutronAPIContext()()
+        self.assertEquals(api_ctxt['enable_nfg_logging'], False)
+
+    def test_neutronapicontext_port_forwarding_on(self):
+        self.setup_neutron_api_context_relation({
+            'enable-port-forwarding': 'True',
+            'l2-population': 'True'
+        })
+        api_ctxt = context.NeutronAPIContext()()
+        self.assertEquals(api_ctxt['enable_port_forwarding'], True)
+
+    def test_neutronapicontext_port_forwarding_off(self):
+        self.setup_neutron_api_context_relation({
+            'enable-port-forwarding': 'False',
+            'l2-population': 'True'
+        })
+        api_ctxt = context.NeutronAPIContext()()
+        self.assertEquals(api_ctxt['enable_port_forwarding'], False)
+
     def test_neutronapicontext_string_converted(self):
         self.setup_neutron_api_context_relation({
             'l2-population': 'True'})
@@ -3810,7 +3846,7 @@ class ContextTests(unittest.TestCase):
             {
                 'openstack_release': 'essex',
                 'operating_system_release': 'xenial'})
-        os_release.assert_called_once_with('python-keystone', base='icehouse')
+        os_release.assert_called_once_with('python-keystone')
         self.lsb_release.assert_called_once_with()
 
     def test_logrotate_context_unset(self):
@@ -3920,3 +3956,13 @@ class ContextTests(unittest.TestCase):
 
         self.assertEqual({'vendor_data_json': '{}'}, ctxt)
         self.assertFalse(log.called)
+
+    @patch.object(context, 'socket')
+    def test_host_info_context(self, _socket):
+        _socket.getfqdn.return_value = 'myhost.mydomain'
+        _socket.gethostname.return_value = 'myhost'
+        ctxt = context.HostInfoContext()()
+        self.assertEqual({
+            'host_fqdn': 'myhost.mydomain',
+            'host': 'myhost'},
+            ctxt)
