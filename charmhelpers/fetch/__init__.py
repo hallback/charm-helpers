@@ -83,15 +83,7 @@ __platform__ = get_platform()
 module = "charmhelpers.fetch.%s" % __platform__
 fetch = importlib.import_module(module)
 
-# This is the one breaking our stuff with yum for Python 2.x
 filter_installed_packages = fetch.filter_installed_packages
-# Does not exist in centos.py, move to ubuntu specific
-#filter_missing_packages = fetch.filter_missing_packages
-# These four moved to platform specific
-#install = fetch.apt_install
-#upgrade = fetch.apt_upgrade
-#update = _fetch_update = fetch.apt_update
-#purge = fetch.apt_purge
 add_source = fetch.add_source
 
 if __platform__ == "ubuntu":
@@ -106,7 +98,6 @@ if __platform__ == "ubuntu":
     apt_unhold = fetch.apt_unhold
     import_key = fetch.import_key
     get_upstream_version = fetch.get_upstream_version
-    # new adds
     filter_missing_packages = fetch.filter_missing_packages
     install = fetch.apt_install
     upgrade = fetch.apt_upgrade
@@ -116,7 +107,6 @@ if __platform__ == "ubuntu":
     get_apt_dpkg_env = fetch.get_apt_dpkg_env
 elif __platform__ == "centos":
     yum_search = fetch.yum_search
-    # new adds
     install = fetch.install
     upgrade = fetch.upgrade
     update = _fetch_update = fetch.update
